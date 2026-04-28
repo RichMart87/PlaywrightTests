@@ -5,7 +5,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace PlaywrightTests;
 
 [TestClass]
-public sealed class Test1 : PlaywrightTestBase
+public sealed class HomePageTests : PlaywrightTestBase
 {
     [TestMethod]
     public async Task WhenNavigatingToSiteConfirmTitle()
