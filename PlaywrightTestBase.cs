@@ -1,8 +1,4 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.Playwright;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace PlaywrightTests;
 
@@ -39,7 +35,8 @@ public abstract class PlaywrightTestBase
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
         Browser = await Playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = true
+            Headless = !System.Diagnostics.Debugger.IsAttached,
+            SlowMo = System.Diagnostics.Debugger.IsAttached ? 100 : null
         });
 
         Context = await Browser.NewContextAsync();
@@ -100,7 +97,7 @@ public abstract class PlaywrightTestBase
     [TestCleanup]
     public async Task TeardownAsync()
     {
-        // Use a local variable so the null check is effective and the framework-assigned context is used
+        // Use local variable so the null check is effective and the framework-assigned context is used
         var context = GetTestContext();
         if (context != null)
         {
