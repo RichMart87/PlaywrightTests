@@ -18,9 +18,25 @@ permissions:
 
 jobs:
   test:
-    name: Build and Run Tests
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slug: api-tests
+            name: API Tests
+            filter: FullyQualifiedName~PlaywrightTests.Tests.ApiTests
+            install-browsers: false
+          - slug: smoke-tests
+            name: Smoke Tests
+            filter: FullyQualifiedName~PlaywrightTests.Tests.SmokeTests
+            install-browsers: true
+          - slug: home-page-tests
+            name: HomePage Tests
+            filter: FullyQualifiedName~PlaywrightTests.Tests.HomePageTests
+            install-browsers: true
 
     steps:
       - name: Checkout repository
@@ -46,21 +62,23 @@ jobs:
         run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Install Playwright browsers
+        if: ${{ matrix.install-browsers }}
         run: pwsh bin/${{ env.BUILD_CONFIGURATION }}/net9.0/playwright.ps1 install --with-deps chromium
 
-      - name: Run tests
+      - name: Run ${{ matrix.name }}
         run: >
           dotnet test --configuration ${{ env.BUILD_CONFIGURATION }} --no-build
-          --logger "trx;LogFileName=test-results.trx"
+          --filter "${{ matrix.filter }}"
+          --logger "trx;LogFileName=${{ matrix.slug }}.trx"
           --logger "console;verbosity=normal"
-          --results-directory ./TestResults
+          --results-directory ./TestResults/${{ matrix.slug }}
 
       - name: Publish test results
         uses: dorny/test-reporter@v1
         if: always()
         with:
-          name: Playwright Test Results
-          path: TestResults/test-results.trx
+          name: ${{ matrix.name }} Results
+          path: TestResults/${{ matrix.slug }}/${{ matrix.slug }}.trx
           reporter: dotnet-trx
           fail-on-error: false
 
@@ -68,9 +86,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.slug }}
           path: |
-            TestResults/**
+            TestResults/${{ matrix.slug }}/**
             /tmp/*.png
           retention-days: 14
           if-no-files-found: ignore

@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.Playwright;
 
 namespace PlaywrightTests.Pages;
@@ -55,9 +55,15 @@ public sealed class HomePage
         var productIds = new List<string>();
         var count = await _productItems.CountAsync();
 
+        if (count == 0)
+            throw new InvalidOperationException("No product items were found on the home page.");
+
         for (int i = 0; i < count; i++)
         {
-            var id = await _productItems.Nth(i).GetAttributeAsync("data-product-id");
+            // data-product-id lives on the "Add to cart" link inside .productinfo, not on the wrapper
+            // itself, and the same link is repeated inside .product-overlay - scope to .productinfo so
+            // the locator resolves to exactly one element per product instead of two.
+            var id = await _productItems.Nth(i).Locator(".productinfo a.add-to-cart").GetAttributeAsync("data-product-id");
             if (id != null)
                 productIds.Add(id);
         }
@@ -75,10 +81,28 @@ public sealed class HomePage
         await productLocator.ClickAsync();
     }
 
-    public async Task<bool> IsCartCountUpdatedAsync (int expectedCount)
+    public Task AddProductToCartByIdAsync(string productId) =>
+        // Scoped to _productItems (the featured-items grid) because the same product ids are
+        // repeated in a "recommended items" carousel further down the page.
+        _productItems
+            .Filter(new LocatorFilterOptions { Has = page.Locator($"[data-product-id='{productId}']") })
+            .Locator(".productinfo a.add-to-cart")
+            .ClickAsync();
+
+    public ILocator AddToCartModal => page.Locator("#cartModal");
+
+    public async Task<bool> IsAddToCartConfirmationVisibleAsync()
     {
-        var cartCountLocator = page.Locator("a[href='/view_cart'] .cart-count");
-        var cartCountText = await cartCountLocator.InnerTextAsync();
-        return int.TryParse(cartCountText, out int actualCount) && actualCount == expectedCount;
+        // The modal fades in after the add-to-cart AJAX call completes, so unlike a plain
+        // IsVisibleAsync() check (no auto-wait) this needs to actively wait for that state.
+        try
+        {
+            await AddToCartModal.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 }

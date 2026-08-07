@@ -1,4 +1,4 @@
-﻿using PlaywrightTests.Pages;
+using PlaywrightTests.Pages;
 
 namespace PlaywrightTests.Tests;
 
@@ -11,9 +11,10 @@ public sealed class HomePageTests : PlaywrightTestBase
         var home = new HomePage(Page!);
         await home.GotoAsync();
 
-        // Get a list of prouct ids from page and click on the first one
+        // Get a list of product ids from the page and add the first one to the cart
         var productIds = await home.GetAllProductIdsAsync();
-        await home.ClickOnProductCategoryAsync(productIds.First());
-        Assert.IsTrue(await home.IsCartCountUpdatedAsync(1), "Cart count should be updated to 1 after adding a product.");
+        await home.AddProductToCartByIdAsync(productIds.First());
+
+        Assert.IsTrue(await home.IsAddToCartConfirmationVisibleAsync(), "Expected the 'Added to cart' confirmation modal to appear.");
     }
 }
