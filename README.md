@@ -28,8 +28,3 @@ The tests write diagnostic output to the MSTest `TestContext`. When running `dot
 
 ### Notes
 - Tests target .NET 9. Adjust your SDK installation accordingly.
-
-### Changes Made:
-1. Added an "Overview" section to provide context about the project.
-2. Ensured consistent formatting and clarity throughout the document.
-3. Preserved all existing information while enhancing the overall flow and coherence.
