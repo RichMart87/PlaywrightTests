@@ -17,7 +17,30 @@ public sealed record ApiUser(
     string Zipcode,
     string State,
     string City,
-    string MobileNumber);
+    string MobileNumber)
+{
+    // Field names expected by the createAccount / updateAccount API endpoints.
+    public (string Key, string Value)[] ToFormFields() =>
+    [
+        ("name", Name),
+        ("email", Email),
+        ("password", Password),
+        ("title", Title),
+        ("birth_date", BirthDate),
+        ("birth_month", BirthMonth),
+        ("birth_year", BirthYear),
+        ("firstname", Firstname),
+        ("lastname", Lastname),
+        ("company", Company),
+        ("address1", Address1),
+        ("address2", Address2),
+        ("country", Country),
+        ("zipcode", Zipcode),
+        ("state", State),
+        ("city", City),
+        ("mobile_number", MobileNumber),
+    ];
+}
 
 public static class TestDataFactory
 {
@@ -36,7 +59,7 @@ public static class TestDataFactory
 
         return new ApiUser(
             Name: $"QA Automation {unique}",
-            Email: $"qa.playwright.{unique}@mailinator.com",
+            Email: CreateUniqueEmail(),
             Password: "P@ssw0rd!123",
             Title: "Mr",
             BirthDate: "15",
@@ -53,4 +76,6 @@ public static class TestDataFactory
             City: "New York",
             MobileNumber: "5555550100");
     }
+
+    public static string CreateUniqueEmail() => $"qa.playwright.{Guid.NewGuid().ToString("N")[..8]}@mailinator.com";
 }

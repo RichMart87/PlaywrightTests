@@ -1,6 +1,7 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using PlaywrightTests.Config;
+using PlaywrightTests.Infrastructure;
 using PlaywrightTests.TestData;
 
 namespace PlaywrightTests.Tests;
@@ -9,6 +10,7 @@ namespace PlaywrightTests.Tests;
 // Note: this API always returns transport-level HTTP 200 - the real status
 // lives in the "responseCode" field of the JSON body, so assertions target that field.
 [TestClass]
+[TestCategory(TestCategories.Api)]
 public sealed class ApiTests
 {
     private static HttpClient client = null!;
@@ -85,7 +87,7 @@ public sealed class ApiTests
     public async Task VerifyLogin_WithRegisteredUser_ReturnsUserExists()
     {
         var user = TestDataFactory.CreateApiUser();
-        await PostAsync("createAccount", ToFields(user));
+        await PostAsync("createAccount", user.ToFormFields());
 
         try
         {
@@ -134,7 +136,7 @@ public sealed class ApiTests
 
         try
         {
-            var json = await PostAsync("createAccount", ToFields(user));
+            var json = await PostAsync("createAccount", user.ToFormFields());
             Assert.AreEqual(201, (int)json["responseCode"]!);
         }
         finally
@@ -147,7 +149,7 @@ public sealed class ApiTests
     public async Task GetUserDetailByEmail_ForExistingUser_ReturnsProfile()
     {
         var user = TestDataFactory.CreateApiUser();
-        await PostAsync("createAccount", ToFields(user));
+        await PostAsync("createAccount", user.ToFormFields());
 
         try
         {
@@ -166,12 +168,12 @@ public sealed class ApiTests
     public async Task UpdateAccount_WithValidData_ReturnsUpdated()
     {
         var user = TestDataFactory.CreateApiUser();
-        await PostAsync("createAccount", ToFields(user));
+        await PostAsync("createAccount", user.ToFormFields());
 
         try
         {
             var updated = user with { Firstname = "Updated" };
-            var json = await PutAsync("updateAccount", ToFields(updated));
+            var json = await PutAsync("updateAccount", updated.ToFormFields());
 
             Assert.AreEqual(200, (int)json["responseCode"]!);
         }
@@ -185,7 +187,7 @@ public sealed class ApiTests
     public async Task DeleteAccount_ForExistingUser_ReturnsOk()
     {
         var user = TestDataFactory.CreateApiUser();
-        await PostAsync("createAccount", ToFields(user));
+        await PostAsync("createAccount", user.ToFormFields());
 
         var json = await DeleteAsync("deleteAccount", ("email", user.Email), ("password", user.Password));
 
@@ -193,27 +195,6 @@ public sealed class ApiTests
     }
 
     // ---- Helpers ----
-
-    private static (string Key, string Value)[] ToFields(ApiUser user) =>
-    [
-        ("name", user.Name),
-        ("email", user.Email),
-        ("password", user.Password),
-        ("title", user.Title),
-        ("birth_date", user.BirthDate),
-        ("birth_month", user.BirthMonth),
-        ("birth_year", user.BirthYear),
-        ("firstname", user.Firstname),
-        ("lastname", user.Lastname),
-        ("company", user.Company),
-        ("address1", user.Address1),
-        ("address2", user.Address2),
-        ("country", user.Country),
-        ("zipcode", user.Zipcode),
-        ("state", user.State),
-        ("city", user.City),
-        ("mobile_number", user.MobileNumber),
-    ];
 
     private static async Task<JsonNode> GetAsync(string endpoint)
     {

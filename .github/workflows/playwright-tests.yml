@@ -29,15 +29,15 @@ jobs:
         include:
           - slug: api-tests
             name: API Tests
-            filter: FullyQualifiedName~PlaywrightTests.Tests.ApiTests
+            filter: TestCategory=Api
             install-browsers: false
           - slug: smoke-tests
             name: Smoke Tests
-            filter: FullyQualifiedName~PlaywrightTests.Tests.SmokeTests
+            filter: TestCategory=Smoke
             install-browsers: true
-          - slug: home-page-tests
-            name: HomePage Tests
-            filter: FullyQualifiedName~PlaywrightTests.Tests.HomePageTests
+          - slug: regression-tests
+            name: Regression Tests
+            filter: TestCategory=Regression
             install-browsers: true
 
     steps:
@@ -68,6 +68,10 @@ jobs:
         run: pwsh bin/${{ env.BUILD_CONFIGURATION }}/net9.0/playwright.ps1 install --with-deps chromium
 
       - name: Run ${{ matrix.name }}
+        env:
+          # Read by Infrastructure/RunSettings.cs - screenshots/traces for failed tests land here
+          TEST_ARTIFACTS_DIR: ${{ github.workspace }}/TestResults/${{ matrix.slug }}/artifacts
+          PW_TRACE: retain-on-failure
         run: >
           dotnet test --configuration ${{ env.BUILD_CONFIGURATION }} --no-build
           --filter "${{ matrix.filter }}"
@@ -84,13 +88,11 @@ jobs:
           reporter: dotnet-trx
           fail-on-error: false
 
-      - name: Upload test results and screenshots
+      - name: Upload test results, screenshots and traces
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.slug }}
-          path: |
-            TestResults/${{ matrix.slug }}/**
-            /tmp/*.png
+          path: TestResults/${{ matrix.slug }}/**
           retention-days: 14
           if-no-files-found: ignore

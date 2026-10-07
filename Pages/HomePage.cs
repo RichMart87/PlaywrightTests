@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Microsoft.Playwright;
 
 namespace PlaywrightTests.Pages;
@@ -6,13 +5,23 @@ namespace PlaywrightTests.Pages;
 public sealed class HomePage
 {
     private readonly IPage page;
-    private ILocator _productItems => page.Locator("div.features_items .product-image-wrapper");
+    private ILocator _recommendedItems => page.Locator(".recommended_items");
+    private ILocator _scrollUpButton => page.Locator("#scrollUp");
+
     public HeaderComponent Header { get; }
+    public ProductGridComponent Products { get; }
+    public SidebarComponent Sidebar { get; }
+    public CartModalComponent CartModal { get; }
+    public SubscriptionComponent Subscription { get; }
 
     public HomePage(IPage page)
     {
         this.page = page;
         Header = new HeaderComponent(page);
+        Products = new ProductGridComponent(page);
+        Sidebar = new SidebarComponent(page);
+        CartModal = new CartModalComponent(page);
+        Subscription = new SubscriptionComponent(page);
     }
 
     // Navigate to the URL of the home page
@@ -25,12 +34,17 @@ public sealed class HomePage
 
     public Task<bool> IsLogoVisibleAsync() => Logo.IsVisibleAsync();
 
-    public ILocator FeaturedProductsSection => page.Locator("div.features_items");
+    public ILocator FeaturedProductsSection => Products.Root;
 
     public Task<bool> IsFeaturedProductsVisibleAsync() => FeaturedProductsSection.IsVisibleAsync();
 
+    // Hero carousel tagline, used to confirm the page is scrolled back to the top
+    public ILocator HeroTagline => page.Locator("#slider-carousel .item.active h2");
+
     public ILocator GetFeaturedProductByName(string productName) =>
         FeaturedProductsSection.Locator($".productinfo p:has-text('{productName}')");
+
+    public Task ClickOnContinueShoppingAsync() => CartModal.ContinueShoppingAsync();
 
     public Task ClickOnFeaturedProductByNameAsync(string productName) =>
         GetFeaturedProductByName(productName).ClickAsync();
@@ -52,52 +66,52 @@ public sealed class HomePage
 
     public async Task<List<string>> GetAllProductIdsAsync()
     {
-        var productIds = new List<string>();
-        var count = await _productItems.CountAsync();
+        var productIds = await Products.GetProductIdsAsync();
 
-        if (count == 0)
+        if (productIds.Count == 0)
             throw new InvalidOperationException("No product items were found on the home page.");
-
-        for (int i = 0; i < count; i++)
-        {
-            // data-product-id lives on the "Add to cart" link inside .productinfo, not on the wrapper
-            // itself, and the same link is repeated inside .product-overlay - scope to .productinfo so
-            // the locator resolves to exactly one element per product instead of two.
-            var id = await _productItems.Nth(i).Locator(".productinfo a.add-to-cart").GetAttributeAsync("data-product-id");
-            if (id != null)
-                productIds.Add(id);
-        }
 
         return productIds;
     }
 
-    public async Task ClickOnProductByIdAsync(string productId)
-    {
-        var productLocator = _productItems.Filter(new LocatorFilterOptions
-        {
-            Has = page.Locator($"[data-product-id='{productId}']")
-        });
+    public Task ClickOnProductByIdAsync(string productId) => Products.ViewProductAsync(productId);
 
-        await productLocator.ClickAsync();
+    // Goes through the featured-items grid because the same product ids are
+    // repeated in a "recommended items" carousel further down the page.
+    public Task AddProductToCartByIdAsync(string productId) => Products.AddToCartAsync(productId);
+
+    public ILocator AddToCartModal => CartModal.Root;
+
+    public Task<bool> IsAddToCartConfirmationVisibleAsync() => CartModal.IsVisibleAsync();
+
+    // ---- Recommended items carousel ----
+
+    public ILocator RecommendedItemsHeading => _recommendedItems.Locator("h2.title");
+
+    // The carousel rotates, so only the active slide's cards are visible and clickable.
+    public async Task<string> AddFirstVisibleRecommendedItemToCartAsync()
+    {
+        await RecommendedItemsHeading.ScrollIntoViewIfNeededAsync();
+        var addButton = _recommendedItems.Locator(".item.active a.add-to-cart").First;
+        var productId = await addButton.GetAttributeAsync("data-product-id")
+            ?? throw new InvalidOperationException("Recommended item has no data-product-id.");
+        await addButton.ClickAsync();
+        return productId;
     }
 
-    public Task AddProductToCartByIdAsync(string productId) =>
-        // Scoped to _productItems (the featured-items grid) because the same product ids are
-        // repeated in a "recommended items" carousel further down the page.
-        _productItems
-            .Filter(new LocatorFilterOptions { Has = page.Locator($"[data-product-id='{productId}']") })
-            .Locator(".productinfo a.add-to-cart")
-            .ClickAsync();
+    // ---- Scrolling ----
 
-    public ILocator AddToCartModal => page.Locator("#cartModal");
+    public Task ScrollToBottomAsync() =>
+        page.EvaluateAsync("() => window.scrollTo(0, document.body.scrollHeight)");
 
-    public async Task<bool> IsAddToCartConfirmationVisibleAsync()
+    public Task ClickScrollUpArrowAsync() => _scrollUpButton.ClickAsync();
+
+    public async Task<bool> WaitForScrolledToTopAsync()
     {
-        // The modal fades in after the add-to-cart AJAX call completes, so unlike a plain
-        // IsVisibleAsync() check (no auto-wait) this needs to actively wait for that state.
+        // jquery.scrollUp animates the scroll, so poll rather than reading scrollY once.
         try
         {
-            await AddToCartModal.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await page.WaitForFunctionAsync("() => window.scrollY === 0");
             return true;
         }
         catch (TimeoutException)
